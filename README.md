@@ -1,0 +1,1 @@
+ To enable rapid tests, I added the ability to change variables from input arguments. These variables can change the lidar blueprint parameters, the type of scan matching algorithm, either ICP or NDT, the amount of iterations for each and the voxel leaf size for NDT and the cp size.  
