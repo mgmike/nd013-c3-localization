@@ -112,6 +112,7 @@ int main(int argc, char* argv[]){
 	string rotation_frequency = "60";
 	string points_per_second = "500000";
 	string map_name = "map.pcd";
+	int dist = 2;
   	int cp_size = 5000;
   	double leafSize = 0.5;
 	bool need_to_write = true;
@@ -133,8 +134,9 @@ int main(int argc, char* argv[]){
         rotation_frequency = argv[7];
         points_per_second = argv[8];
 		map_name = argv[9];
-        cp_size = stoi(argv[10]);
-        leafSize = stod(argv[11]);
+		dist = stoi(argv[10]);
+        cp_size = stoi(argv[11]);
+        leafSize = stod(argv[12]);
       
     }
   	std::stringstream ss;
@@ -263,7 +265,7 @@ int main(int argc, char* argv[]){
                     transform_sm = NDT(ndt, cloudFiltered, pose, iters);
                 	pose = getPose(transform_sm);
                 } else if(matching == Icp){
-                    transform_sm = ICPS(mapCloud, cloudFiltered, pose, iters);
+                    transform_sm = ICPS(mapCloud, cloudFiltered, pose, iters, dist);
                 	pose = getPose(transform_sm);
                 }
             }

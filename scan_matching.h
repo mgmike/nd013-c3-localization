@@ -18,5 +18,5 @@ struct Pair{
 };
 
 Eigen::Matrix4d ICP(PointCloudT::Ptr target, PointCloudT::Ptr source, Pose startingPose, int iterations);
-Eigen::Matrix4d ICPS(PointCloudT::Ptr target, PointCloudT::Ptr source, Pose startingPose, int iterations);
+Eigen::Matrix4d ICPS(PointCloudT::Ptr target, PointCloudT::Ptr source, Pose startingPose, int iterations, int dist);
 Eigen::Matrix4d NDT(pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> ndt, PointCloudT::Ptr ssource, Pose startingPose, int iterations);
