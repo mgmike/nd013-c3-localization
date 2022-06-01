@@ -28,6 +28,7 @@ using namespace std;
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/filters/voxel_grid.h>
 #include "helper.h"
+#include "scan_matching.h"
 #include <sstream>
 #include <chrono> 
 #include <ctime> 
@@ -99,7 +100,47 @@ void drawCar(Pose pose, int num, Color color, double alpha, pcl::visualization::
 	renderBox(viewer, box, num, color, alpha);
 }
 
-int main(){
+int main(int argc, char* argv[]){
+  	// I added the ability to change values through input params for rapid testing
+  	enum Registration{ Off, Ndt, Icp};
+  	Registration matching = Off;
+	int iters = 10;
+  	string upper_fov = "15";
+	string lower_fov = "-25";
+	string channels = "32";
+	string range = "30";
+	string rotation_frequency = "60";
+	string points_per_second = "500000";
+	string map_name = "map.pcd";
+  	int cp_size = 5000;
+  	double leafSize = 0.5;
+	bool need_to_write = true;
+  
+  	// Handle input
+  	if (argc > 1){
+    	if (strcmp(argv[1], "ndt") == 0){
+          	matching = Ndt;
+        } else if (strcmp(argv[1], "icp") == 0){
+          	matching = Icp;
+        } else {
+        	return 0;
+        }
+		iters = stoi(argv[2]);
+      	upper_fov = argv[3];
+        lower_fov = argv[4];
+        channels = argv[5];
+        range = argv[6];
+        rotation_frequency = argv[7];
+        points_per_second = argv[8];
+		map_name = argv[9];
+        cp_size = stoi(argv[10]);
+        leafSize = stod(argv[11]);
+      
+    }
+  	std::stringstream ss;
+  	for (int i = 1; i < argc; i++){
+  		ss << argv[i] << " ";
+    }
 
 	auto client = cc::Client("localhost", 2000);
 	client.SetTimeout(2s);
@@ -114,13 +155,12 @@ int main(){
 
 	//Create lidar
 	auto lidar_bp = *(blueprint_library->Find("sensor.lidar.ray_cast"));
-	// CANDO: Can modify lidar values to get different scan resolutions
-	lidar_bp.SetAttribute("upper_fov", "15");
-    lidar_bp.SetAttribute("lower_fov", "-25");
-    lidar_bp.SetAttribute("channels", "32");
-    lidar_bp.SetAttribute("range", "30");
-	lidar_bp.SetAttribute("rotation_frequency", "60");
-	lidar_bp.SetAttribute("points_per_second", "500000");
+	lidar_bp.SetAttribute("upper_fov", upper_fov);
+    lidar_bp.SetAttribute("lower_fov", lower_fov);
+    lidar_bp.SetAttribute("channels", channels);
+    lidar_bp.SetAttribute("range", range);
+	lidar_bp.SetAttribute("rotation_frequency", rotation_frequency);
+	lidar_bp.SetAttribute("points_per_second", points_per_second);
 
 	auto user_offset = cg::Location(0, 0, 0);
 	auto lidar_transform = cg::Transform(cg::Location(-0.5, 0, 1.8) + user_offset);
@@ -138,14 +178,23 @@ int main(){
 
 	// Load map
 	PointCloudT::Ptr mapCloud(new PointCloudT);
-  	pcl::io::loadPCDFile("map.pcd", *mapCloud);
-  	cout << "Loaded " << mapCloud->points.size() << " data points from map.pcd" << endl;
+  	pcl::io::loadPCDFile(map_name, *mapCloud);
+  	cout << "Loaded " << mapCloud->points.size() << " data points from " << map_name << endl;
 	renderPointCloud(viewer, mapCloud, "map", Color(0,0,1)); 
+  
+  	// Create ndt map object once if ndt is the chosen scan matching algorithm 
+	pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> ndt;
+  	if (matching == Ndt){
+      	ndt.setTransformationEpsilon(0.0001);
+      	ndt.setInputTarget(mapCloud);
+      	ndt.setResolution(1);
+      	ndt.setStepSize(1);
+    }
 
 	typename pcl::PointCloud<PointT>::Ptr cloudFiltered (new pcl::PointCloud<PointT>);
 	typename pcl::PointCloud<PointT>::Ptr scanCloud (new pcl::PointCloud<PointT>);
 
-	lidar->Listen([&new_scan, &lastScanTime, &scanCloud](auto data){
+	lidar->Listen([&new_scan, &lastScanTime, &scanCloud, cp_size](auto data){
 
 		if(new_scan){
 			auto scan = boost::static_pointer_cast<csd::LidarMeasurement>(data);
@@ -154,7 +203,7 @@ int main(){
 					pclCloud.points.push_back(PointT(detection.point.x, detection.point.y, detection.point.z));
 				}
 			}
-			if(pclCloud.points.size() > 5000){ // CANDO: Can modify this value to get different scan resolutions
+			if(pclCloud.points.size() > cp_size){
 				lastScanTime = std::chrono::system_clock::now();
 				*scanCloud = pclCloud;
 				new_scan = false;
@@ -200,16 +249,32 @@ int main(){
 		if(!new_scan){
 			
 			new_scan = true;
-			// TODO: (Filter scan using voxel filter)
+			// Filter scan using voxel filter
+          
+          	pcl::VoxelGrid<PointT> vg;
+          	vg.setInputCloud(scanCloud);
+          	vg.setLeafSize(leafSize, leafSize, leafSize);
+          	vg.filter(*cloudFiltered);
 
-			// TODO: Find pose transform by using ICP or NDT matching
-			//pose = ....
-
-			// TODO: Transform scan so it aligns with ego's actual pose and render that scan
+			// Find pose transform by using ICP or NDT matching
+			Eigen::Matrix4d transform_sm;
+          	if( matching != Off){
+                if( matching == Ndt){
+                    transform_sm = NDT(ndt, cloudFiltered, pose, iters);
+                	pose = getPose(transform_sm);
+                } else if(matching == Icp){
+                    transform_sm = ICPS(mapCloud, cloudFiltered, pose, iters);
+                	pose = getPose(transform_sm);
+                }
+            }
+          
+			// Transform scan so it aligns with ego's actual pose and render that scan
+          	PointCloudT::Ptr transformed_scan (new PointCloudT);
+          	pcl::transformPointCloud(*cloudFiltered, *transformed_scan, transform_sm);
+          
 
 			viewer->removePointCloud("scan");
-			// TODO: Change `scanCloud` below to your transformed scan
-			renderPointCloud(viewer, scanCloud, "scan", Color(1,0,0) );
+			renderPointCloud(viewer, transformed_scan, "scan", Color(1,0,0) );
 
 			viewer->removeAllShapes();
 			drawCar(pose, 1,  Color(0,1,0), 0.35, viewer);
@@ -227,13 +292,27 @@ int main(){
 
 			if(maxError > 1.2 || distDriven >= 170.0 ){
 				viewer->removeShape("eval");
-			if(maxError > 1.2){
-				viewer->addText("Try Again", 200, 50, 32, 1.0, 0.0, 0.0, "eval",0);
+				if(maxError > 1.2){
+					viewer->addText("Try Again", 200, 50, 32, 1.0, 0.0, 0.0, "eval",0);
+					if (need_to_write){
+						std::cout << ss.str() << maxError << " " << distDriven << " " << "F";
+						std::ofstream outfile;
+						outfile.open("Stats.txt", std::ios_base::app);
+						outfile << ss.str() << maxError << " " << distDriven << " " << "F" << std::endl;
+						need_to_write = false;
+					}
+				}
+				else{
+					viewer->addText("Passed!", 200, 50, 32, 0.0, 1.0, 0.0, "eval",0);
+					if (need_to_write){
+						std::cout << ss.str() << maxError << " " << distDriven << " " << "P";
+						std::ofstream outfile;
+						outfile.open("Stats.txt", std::ios_base::app);
+						outfile << ss.str() << maxError << " " << distDriven << " " << "P" << std::endl;
+						need_to_write = false;
+					}
+				}
 			}
-			else{
-				viewer->addText("Passed!", 200, 50, 32, 0.0, 1.0, 0.0, "eval",0);
-			}
-		}
 
 			pclCloud.points.clear();
 		}

@@ -11,8 +11,9 @@ add_definitions(-std=c++14 -O3)
 set(CXX_FLAGS "-pthread -fPIC -DNDEBUG -Wextra")
 set(CMAKE_CXX_FLAGS "${CXX_FLAGS} -Wl,-Bstatic -lboost_filesystem -Wl,-Bdynamic")
 
-set(sources c3-main.cpp helper.cpp)
+set(sources c3-main.cpp helper.cpp scan_matching.cpp)
 
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 set(CARLALIB_DIR ${CMAKE_SOURCE_DIR}/libcarla-install/lib)
 set(carla_libs  ${CARLALIB_DIR}/libboost_filesystem.a ${CARLALIB_DIR}/libboost_numpy36.a ${CARLALIB_DIR}/libboost_program_options.a ${CARLALIB_DIR}/libboost_python36.a ${CARLALIB_DIR}/libboost_system.a ${CARLALIB_DIR}/libcarla_client.a ${CARLALIB_DIR}/librpc.a ${CARLALIB_DIR}/libDebugUtils.a ${CARLALIB_DIR}/libDetour.a ${CARLALIB_DIR}/libDetourCrowd.a ${CARLALIB_DIR}/libDetourTileCache.a ${CARLALIB_DIR}/libRecast.a)
 
@@ -22,7 +23,6 @@ include_directories(libcarla-install/include/system)
 include_directories(rpclib/include)
 
 find_package(PCL 1.2 REQUIRED)
-find_package(Boost 1.60.0 COMPONENTS filesystem system REQUIRED)
 
 include_directories(${PCL_INCLUDE_DIRS})
 link_directories(${PCL_LIBRARY_DIRS})
@@ -32,6 +32,6 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
-add_executable(${CMAKE_SOURCE_DIR}/cloud_loc ${sources} )
+add_executable(cloud_loc ${sources} )
 
 target_link_libraries(cloud_loc ${PCL_LIBRARIES} ${carla_libs})

@@ -4,6 +4,9 @@
 #include <vector>
 #include <Eigen/Geometry>
 
+#ifndef HELPER_H
+#define HELPER_H
+
 typedef pcl::PointXYZ PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
 
@@ -249,3 +252,5 @@ struct Lidar{
 		y += step * sin(theta);
 	}
 };
+
+#endif
