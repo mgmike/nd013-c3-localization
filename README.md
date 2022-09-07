@@ -1,6 +1,23 @@
 # Localization
 
- To enable rapid tests, I added the ability to change variables from input arguments. These variables can change the lidar blueprint parameters, the type of scan matching algorithm, either ICP or NDT, the amount of iterations for each and the voxel leaf size for NDT and the cp size.  
+## My implimentation
+
+ I was able to impliment icp and ndt successfully by using the pcl libraries IterativeClosestPoint and NormalDistributionsTransform. The following gif shows a successful run with icp at speed 3. 
+
+ ![Localization ICP](images/Localization1.gif)
+
+ The next gif shows a successful run with ndt at speeds 4 then 3.
+
+ ![Localization NDT](images/Localization_ndt_4-3.gif)
+
+ I also scanned a larger map to use as input. Due to the way larger size of this new map, localization is a lot slower, and was unable to localize as effiecntly as previously. I plan on reducing the target map to only contain points a certain distance away from the vehicle's last known position to reduce localization costs. 
+
+ I moved these scan matching algorithms into the new files scan_matching.cpp and scan_matching.h. I also converted the 2D non pcl ICP from the exercise to 3D and moved the initialization of the transformed source point cloud, associations and pairs into a for loop in an attempt to implement iterations of the ICP algorithm. The gif below shows that my ICP implimentation from scratch runs without error, however it is not able to localize. I have been pretty thorough in where the point cloud pointers point and how the tranformation matricies are populated, however I was unable to figure out why this is.
+
+ ![Localization on larger map](images/Localization_ndt_3_loop.gif)
+
+ The last change I made to the provided code was the addition of command line input arguments to change hyper-parameters. This was necessary to avoid having to recompile the code every time I wanted to make a change. These variables can change the type of scan matching algorithm, either ICP or NDT and the amount of iterations for each, the lidar blueprint parameters, the target map, the maximum distance ICP Nearest Neighbour function will use to find target points near each source point, and the cp_size and voxel leaf size for NDT. 
+
 
 ## Creating ICP from scratch:
 
