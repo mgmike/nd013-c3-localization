@@ -1,22 +1,9 @@
 
-#include <carla/client/Client.h>
-#include <carla/client/ActorBlueprint.h>
-#include <carla/client/BlueprintLibrary.h>
-#include <carla/client/Map.h>
-#include <carla/geom/Location.h>
-#include <carla/geom/Transform.h>
-#include <carla/client/Sensor.h>
-#include <carla/sensor/data/LidarMeasurement.h>
 #include <thread>
-
-#include <carla/client/Vehicle.h>
 
 //pcl code
 //#include "render/render.h"
 
-namespace cc = carla::client;
-namespace cg = carla::geom;
-namespace csd = carla::sensor::data;
 
 using namespace std::chrono_literals;
 using namespace std::string_literals;
@@ -37,57 +24,9 @@ using namespace std;
 #include <pcl/console/time.h>   // TicToc
 
 PointCloudT pclCloud;
-cc::Vehicle::Control control;
 std::chrono::time_point<std::chrono::system_clock> currentTime;
-vector<ControlState> cs;
 
 bool refresh_view = false;
-void keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event, void* viewer)
-{
-
-  	//boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer = *static_cast<boost::shared_ptr<pcl::visualization::PCLVisualizer> *>(viewer_void);
-	if (event.getKeySym() == "Right" && event.keyDown()){
-		cs.push_back(ControlState(0, -0.02, 0));
-  	}
-	else if (event.getKeySym() == "Left" && event.keyDown()){
-		cs.push_back(ControlState(0, 0.02, 0)); 
-  	}
-  	if (event.getKeySym() == "Up" && event.keyDown()){
-		cs.push_back(ControlState(0.1, 0, 0));
-  	}
-	else if (event.getKeySym() == "Down" && event.keyDown()){
-		cs.push_back(ControlState(-0.1, 0, 0)); 
-  	}
-	if(event.getKeySym() == "a" && event.keyDown()){
-		refresh_view = true;
-	}
-}
-
-void Accuate(ControlState response, cc::Vehicle::Control& state){
-
-	if(response.t > 0){
-		if(!state.reverse){
-			state.throttle = min(state.throttle+response.t, 1.0f);
-		}
-		else{
-			state.reverse = false;
-			state.throttle = min(response.t, 1.0f);
-		}
-	}
-	else if(response.t < 0){
-		response.t = -response.t;
-		if(state.reverse){
-			state.throttle = min(state.throttle+response.t, 1.0f);
-		}
-		else{
-			state.reverse = true;
-			state.throttle = min(response.t, 1.0f);
-
-		}
-	}
-	state.steer = min( max(state.steer+response.s, -1.0f), 1.0f);
-	state.brake = response.b;
-}
 
 void drawCar(Pose pose, int num, Color color, double alpha, pcl::visualization::PCLVisualizer::Ptr& viewer){
 
@@ -144,38 +83,12 @@ int main(int argc, char* argv[]){
   		ss << argv[i] << " ";
     }
 
-	auto client = cc::Client("localhost", 2000);
-	client.SetTimeout(2s);
-	auto world = client.GetWorld();
-
-	auto blueprint_library = world.GetBlueprintLibrary();
-	auto vehicles = blueprint_library->Filter("vehicle");
-
-	auto map = world.GetMap();
-	auto transform = map->GetRecommendedSpawnPoints()[1];
-	auto ego_actor = world.SpawnActor((*vehicles)[12], transform);
-
-	//Create lidar
-	auto lidar_bp = *(blueprint_library->Find("sensor.lidar.ray_cast"));
-	lidar_bp.SetAttribute("upper_fov", upper_fov);
-    lidar_bp.SetAttribute("lower_fov", lower_fov);
-    lidar_bp.SetAttribute("channels", channels);
-    lidar_bp.SetAttribute("range", range);
-	lidar_bp.SetAttribute("rotation_frequency", rotation_frequency);
-	lidar_bp.SetAttribute("points_per_second", points_per_second);
-
-	auto user_offset = cg::Location(0, 0, 0);
-	auto lidar_transform = cg::Transform(cg::Location(-0.5, 0, 1.8) + user_offset);
-	auto lidar_actor = world.SpawnActor(lidar_bp, lidar_transform, ego_actor.get());
-	auto lidar = boost::static_pointer_cast<cc::Sensor>(lidar_actor);
 	bool new_scan = true;
 	std::chrono::time_point<std::chrono::system_clock> lastScanTime, startTime;
 
 	pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
   	viewer->setBackgroundColor (0, 0, 0);
-	viewer->registerKeyboardCallback(keyboardEventOccurred, (void*)&viewer);
 
-	auto vehicle = boost::static_pointer_cast<cc::Vehicle>(ego_actor);
 	Pose pose(Point(0,0,0), Rotate(0,0,0));
 
 	// Load map
@@ -196,31 +109,30 @@ int main(int argc, char* argv[]){
 	typename pcl::PointCloud<PointT>::Ptr cloudFiltered (new pcl::PointCloud<PointT>);
 	typename pcl::PointCloud<PointT>::Ptr scanCloud (new pcl::PointCloud<PointT>);
 
-	lidar->Listen([&new_scan, &lastScanTime, &scanCloud, cp_size](auto data){
+	// lidar->Listen([&new_scan, &lastScanTime, &scanCloud, cp_size](auto data){
 
-		if(new_scan){
-			auto scan = boost::static_pointer_cast<csd::LidarMeasurement>(data);
-			for (auto detection : *scan){
-				if((detection.point.x*detection.point.x + detection.point.y*detection.point.y + detection.point.z*detection.point.z) > 8.0){ // Don't include points touching ego
-					pclCloud.points.push_back(PointT(detection.point.x, detection.point.y, detection.point.z));
-				}
-			}
-			if(pclCloud.points.size() > cp_size){
-				lastScanTime = std::chrono::system_clock::now();
-				*scanCloud = pclCloud;
-				new_scan = false;
-			}
-		}
-	});
+	// 	if(new_scan){
+	// 		auto scan = boost::static_pointer_cast<csd::LidarMeasurement>(data);
+	// 		for (auto detection : *scan){
+	// 			if((detection.point.x*detection.point.x + detection.point.y*detection.point.y + detection.point.z*detection.point.z) > 8.0){ // Don't include points touching ego
+	// 				pclCloud.points.push_back(PointT(detection.point.x, detection.point.y, detection.point.z));
+	// 			}
+	// 		}
+	// 		if(pclCloud.points.size() > cp_size){
+	// 			lastScanTime = std::chrono::system_clock::now();
+	// 			*scanCloud = pclCloud;
+	// 			new_scan = false;
+	// 		}
+	// 	}
+	// });
 	
-	Pose poseRef(Point(vehicle->GetTransform().location.x, vehicle->GetTransform().location.y, vehicle->GetTransform().location.z), Rotate(vehicle->GetTransform().rotation.yaw * pi/180, vehicle->GetTransform().rotation.pitch * pi/180, vehicle->GetTransform().rotation.roll * pi/180));
+	Pose poseRef(Point(0.0, 0.0, 0.0), Rotate(0.0, 0.0, 0.0));
 	double maxError = 0;
 
 	while (!viewer->wasStopped())
   	{
 		while(new_scan){
 			std::this_thread::sleep_for(0.1s);
-			world.Tick(1s);
 		}
 		if(refresh_view){
 			viewer->setCameraPosition(pose.position.x, pose.position.y, 60, pose.position.x+1, pose.position.y+1, 0, 0, 0, 1);
@@ -229,22 +141,13 @@ int main(int argc, char* argv[]){
 		
 		viewer->removeShape("box0");
 		viewer->removeShape("boxFill0");
-		Pose truePose = Pose(Point(vehicle->GetTransform().location.x, vehicle->GetTransform().location.y, vehicle->GetTransform().location.z), Rotate(vehicle->GetTransform().rotation.yaw * pi/180, vehicle->GetTransform().rotation.pitch * pi/180, vehicle->GetTransform().rotation.roll * pi/180)) - poseRef;
+		Pose truePose = Pose(Point(1.0, 1.0, 1.0), Rotate(0.0, 0.0, 0.0)) - poseRef;
 		drawCar(truePose, 0,  Color(1,0,0), 0.7, viewer);
 		double theta = truePose.rotation.yaw;
-		double stheta = control.steer * pi/4 + theta;
+		double stheta = 1 * pi/4 + theta;
 		viewer->removeShape("steer");
 		renderRay(viewer, Point(truePose.position.x+2*cos(theta), truePose.position.y+2*sin(theta),truePose.position.z),  Point(truePose.position.x+4*cos(stheta), truePose.position.y+4*sin(stheta),truePose.position.z), "steer", Color(0,1,0));
 
-
-		ControlState accuate(0, 0, 1);
-		if(cs.size() > 0){
-			accuate = cs.back();
-			cs.clear();
-
-			Accuate(accuate, control);
-			vehicle->ApplyControl(control);
-		}
 
   		viewer->spinOnce ();
 		
