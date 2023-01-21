@@ -39,3 +39,8 @@
     - Calculate movement matrix t dx1 2x1 = Q - R * P
     - Populate transformation matrix with R and t
     - Transform transformation matrix by initTransform
+
+
+To run locally, call cmake the following way:
+
+This is documented [here](https://github.com/PointCloudLibrary/pcl/issues/5052)

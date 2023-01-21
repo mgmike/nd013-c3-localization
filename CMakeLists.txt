@@ -12,7 +12,7 @@ add_definitions(-std=c++14 -O3)
 set(CXX_FLAGS "-pthread -fPIC -DNDEBUG -Wextra")
 set(CMAKE_CXX_FLAGS "${CXX_FLAGS} -Wl,-Bstatic -lboost_filesystem -Wl,-Bdynamic")
 
-set(sources c3-main.cpp helper.cpp scan_matching.cpp)
+set(sources c3-main.cpp helper.cpp scan_matching.cpp ndt.cpp icp.cpp icps.cpp)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR})
 

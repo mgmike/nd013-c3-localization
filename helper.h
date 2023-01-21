@@ -28,6 +28,15 @@ struct Point{
 	}
 };
 
+struct Pair{
+
+	Point p1;
+	Point p2;
+
+	Pair(Point setP1, Point setP2)
+		: p1(setP1), p2(setP2){}
+};
+
 struct Rotate{
 	double yaw, pitch, roll;
 
@@ -59,6 +68,7 @@ struct Pose{
         return result;
     }
 };
+
 
 struct ControlState{
 

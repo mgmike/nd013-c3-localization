@@ -2,3 +2,4 @@ build/
 libcarla-install/
 rpclib/
 big_map.pcd
+.vscode/

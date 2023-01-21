@@ -1,22 +1,16 @@
-#include <pcl/io/pcd_io.h>
-#include <Eigen/Geometry>
-#include <Eigen/SVD>
-using namespace Eigen;
-#include <pcl/registration/icp.h>
-#include <pcl/registration/ndt.h>
-#include <pcl/console/time.h>   // TicToc
-
 #include "helper.h"
+#include <Eigen/Geometry>
 
-struct Pair{
+#ifndef SCANMATCHING_H
+#define SCANMATCHING_H
 
-	Point p1;
-	Point p2;
-
-	Pair(Point setP1, Point setP2)
-		: p1(setP1), p2(setP2){}
+class Scan_Matching
+{
+public:
+	PointCloudT::Ptr target;
+	
+	void set_map(PointCloudT::Ptr target);
+	Eigen::Matrix4d get_transform(PointCloudT::Ptr source);
 };
 
-Eigen::Matrix4d ICP(PointCloudT::Ptr target, PointCloudT::Ptr source, Pose startingPose, int iterations);
-Eigen::Matrix4d ICPS(PointCloudT::Ptr target, PointCloudT::Ptr source, Pose startingPose, int iterations, int dist);
-Eigen::Matrix4d NDT(pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> ndt, PointCloudT::Ptr ssource, Pose startingPose, int iterations);
+#endif

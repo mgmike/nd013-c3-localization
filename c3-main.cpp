@@ -15,7 +15,8 @@ using namespace std;
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/filters/voxel_grid.h>
 #include "helper.h"
-#include "scan_matching.h"
+#include "ndt.h"
+#include "icp.h"
 #include <sstream>
 #include <chrono> 
 #include <ctime> 
@@ -23,8 +24,7 @@ using namespace std;
 #include <pcl/registration/ndt.h>
 #include <pcl/console/time.h>   // TicToc
 
-PointCloudT pclCloud;
-std::chrono::time_point<std::chrono::system_clock> currentTime;
+
 
 bool refresh_view = false;
 
@@ -55,6 +55,10 @@ int main(int argc, char* argv[]){
   	int cp_size = 5000;
   	double leafSize = 0.5;
 	bool need_to_write = true;
+
+	Scan_Matching* scan_matching;
+	PointCloudT pclCloud;
+	std::chrono::time_point<std::chrono::system_clock> currentTime;
   
   	// Handle input
   	if (argc > 1){
@@ -97,14 +101,11 @@ int main(int argc, char* argv[]){
   	cout << "Loaded " << mapCloud->points.size() << " data points from " << map_name << endl;
 	renderPointCloud(viewer, mapCloud, "map", Color(0,0,1)); 
   
-  	// Create ndt map object once if ndt is the chosen scan matching algorithm 
-	pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> ndt;
-  	if (matching == Ndt){
-      	ndt.setTransformationEpsilon(0.0001);
-      	ndt.setInputTarget(mapCloud);
-      	ndt.setResolution(1);
-      	ndt.setStepSize(1);
-    }
+	if (matching == Ndt){
+		scan_matching = new NDT(mapCloud, pose, iters);
+	} else if (matching == Icp){
+		scan_matching = new ICP(mapCloud, pose, iters);
+	} else { return 0;}
 
 	typename pcl::PointCloud<PointT>::Ptr cloudFiltered (new pcl::PointCloud<PointT>);
 	typename pcl::PointCloud<PointT>::Ptr scanCloud (new pcl::PointCloud<PointT>);
@@ -163,16 +164,11 @@ int main(int argc, char* argv[]){
 
 			// Find pose transform by using ICP or NDT matching
 			Eigen::Matrix4d transform_sm;
-          	if( matching != Off){
-                if( matching == Ndt){
-                    transform_sm = NDT(ndt, cloudFiltered, pose, iters);
-                	pose = getPose(transform_sm);
-                } else if(matching == Icp){
-                    transform_sm = ICPS(mapCloud, cloudFiltered, pose, iters, dist);
-                	pose = getPose(transform_sm);
-                }
-            }
-          
+
+			scan_matching->get_transform(mapCloud);
+
+			pose = getPose(transform_sm);
+
 			// Transform scan so it aligns with ego's actual pose and render that scan
           	PointCloudT::Ptr transformed_scan (new PointCloudT);
           	pcl::transformPointCloud(*cloudFiltered, *transformed_scan, transform_sm);
